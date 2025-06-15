@@ -1,16 +1,30 @@
-# neweather
+# Neweather
 
-A new Flutter project.
+A Flutter mobile application with a weather and news dashboard. 
 
-## Getting Started
+## Features
 
-This project is a starting point for a Flutter application.
+- Weather dashboard
+- News Dashboard
+- Automatic city detection using geolocator and geocode
+- Bookmarking of news articles
+- Offline caching of news articles using Hive
+- Dedicated Weather page with weekly forecast
+- Open articles in-app with WebView
+- Togglable Dark/light mode implemented real-time using Provider state management
+- uses flutter_dotenv to import API_KEY and ensure no credential leaks in version control
 
-A few resources to get you started if this is your first Flutter project:
+## Features to be implemented
+- Smooth animations
+- Hero animations
+- Weather visualisation
+- News article search
+- Querying debouncing
+- Cleaning up architecture
+- Better error control
+- explicity location permission request
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## setup info
+- required Java 11 at the least
+- ndkVersion 27.0.12077973
