@@ -1,26 +1,29 @@
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'article.dart';
+import 'package:provider/provider.dart';
+import 'package:neweather/config/themer.dart';
 
 class BookmarksScreen extends StatelessWidget {
   const BookmarksScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = Provider.of<ThemeProvider>(context).isDarkMode;
     final bookmarksBox = Hive.box('bookmarksBox');
     final bookmarks = bookmarksBox.values.toList();
 
     return SafeArea(
       child: Scaffold(
         appBar: AppBar(
-          backgroundColor: Colors.black,
-          title: const Text('Bookmarks', style: TextStyle(color: Colors.white)),
+          backgroundColor: isDarkMode ? Colors.black : Colors.white,
+          title: Text('Bookmarks', style: TextStyle(color: isDarkMode ? Colors.white : Colors.black,)),
           iconTheme: const IconThemeData(color: Colors.white),
         ),
-        backgroundColor: Colors.black,
+        backgroundColor: isDarkMode ? Colors.black : Colors.white,
         body: bookmarks.isEmpty
-            ? const Center(
-                child: Text('No bookmarks yet', style: TextStyle(color: Colors.white)),
+            ? Center(
+                child: Text('No bookmarks yet', style: TextStyle(color: isDarkMode ? Colors.white : Colors.black,)),
               )
             : ListView.builder(
                 padding: const EdgeInsets.all(16),
@@ -48,7 +51,7 @@ class BookmarksScreen extends StatelessWidget {
                       margin: const EdgeInsets.symmetric(vertical: 8),
                       height: 150,
                       decoration: BoxDecoration(
-                        color: Colors.grey.shade300,
+                        color: isDarkMode ? Colors.grey.shade300 : Colors.black,
                         borderRadius: BorderRadius.circular(16),
                       ),
                       child: Row(
@@ -80,12 +83,17 @@ class BookmarksScreen extends StatelessWidget {
                                       style: TextStyle(
                                           fontSize: 18 * scale,
                                           fontWeight: FontWeight.bold,
+                                          color: isDarkMode ? Colors.black : Colors.white,
                                           fontFamily: 'monospace')),
                                   const SizedBox(height: 4),
                                   Text(desc,
                                       maxLines: 3,
                                       overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(fontFamily: 'monospace')),
+                                      style: TextStyle(
+                                        fontFamily: 'monospace',
+                                        color: isDarkMode ? Colors.black : Colors.white,
+                                      )
+                                    ),
                                 ],
                               ),
                             ),

@@ -7,6 +7,11 @@ import 'package:provider/provider.dart';
 import 'package:neweather/config/themer.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
+import 'package:hive_flutter/hive_flutter.dart';
+
+import 'package:neweather/widgets/weathercard.dart';
+import 'package:neweather/widgets/weeklyforecast.dart';
+import 'package:neweather/widgets/cityweathercomp.dart';
 
 class WeatherScreen extends StatefulWidget {
   const WeatherScreen({super.key});
@@ -22,12 +27,19 @@ class _WeatherScreenState extends State<WeatherScreen> {
   String city = 'Bangalore';
   bool isLoading = true;
   String? errorMsg;
+  late Box weatherCacheBox;
 
   @override
   void initState() {
     super.initState();
-    determinePositionAndFetchWeather();
+    _initHiveAndFetchWeather();
   }
+
+  Future<void> _initHiveAndFetchWeather() async {
+  await Hive.initFlutter();
+  weatherCacheBox = await Hive.openBox('weatherCacheBox');
+  determinePositionAndFetchWeather();
+}
 
   Future<void> determinePositionAndFetchWeather() async {
     setState(() {
@@ -65,7 +77,7 @@ class _WeatherScreenState extends State<WeatherScreen> {
       }
 
       Position position = await Geolocator.getCurrentPosition(
-          desiredAccuracy: LocationAccuracy.low);
+          locationSettings: LocationSettings(accuracy: LocationAccuracy.low));
 
       List<Placemark> placemarks = await placemarkFromCoordinates(
           position.latitude, position.longitude);
@@ -84,6 +96,24 @@ class _WeatherScreenState extends State<WeatherScreen> {
     }
   }
 
+  void _loadWeatherFromCache(String city) {
+    final cachedWeather = weatherCacheBox.get('weather_$city');
+    final cachedForecast = weatherCacheBox.get('forecast_$city');
+    if (cachedWeather != null && cachedForecast != null) {
+      setState(() {
+        currentWeather = Map<String, dynamic>.from(cachedWeather);
+        dailyForecast = List<Map<String, dynamic>>.from(cachedForecast);
+        errorMsg = "Showing cached data (offline)";
+        isLoading = false;
+      });
+    } else {
+      setState(() {
+        errorMsg = "No cached data available.";
+        isLoading = false;
+      });
+    }
+  }
+
   Future<void> fetchWeatherData() async {
     final currentUrl =
         'https://api.openweathermap.org/data/2.5/weather?q=$city&units=metric&appid=$apiKey';
@@ -95,23 +125,24 @@ class _WeatherScreenState extends State<WeatherScreen> {
       final forecastResponse = await http.get(Uri.parse(forecastUrl));
 
       if (currentResponse.statusCode == 200 && forecastResponse.statusCode == 200) {
+        final currentData = json.decode(currentResponse.body);
+        final forecastList = json.decode(forecastResponse.body)['list'];
+        final daily = _extractDailyForecast(forecastList);
+
+        // Cache both current and forecast
+        weatherCacheBox.put('weather_$city', currentData);
+        weatherCacheBox.put('forecast_$city', daily);
+
         setState(() {
-          currentWeather = json.decode(currentResponse.body);
-          final forecastList = json.decode(forecastResponse.body)['list'];
-          dailyForecast = _extractDailyForecast(forecastList);
+          currentWeather = currentData;
+          dailyForecast = daily;
           isLoading = false;
         });
       } else {
-        setState(() {
-          errorMsg = "Error fetching weather data for $city";
-          isLoading = false;
-        });
+        _loadWeatherFromCache(city);
       }
     } catch (e) {
-      setState(() {
-        errorMsg = "Error fetching weather: $e";
-        isLoading = false;
-      });
+      _loadWeatherFromCache(city);
     }
   }
 
@@ -131,15 +162,6 @@ class _WeatherScreenState extends State<WeatherScreen> {
     return temp.values.take(7).toList();
   }
 
-  void _addCityComparison() {
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Choose City'),
-        content: const Text('City picker coming soon!'),
-      ),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -165,108 +187,36 @@ class _WeatherScreenState extends State<WeatherScreen> {
             )
           ),
         ),
+
         body: Padding(
           padding: const EdgeInsets.all(16.0),
           child: isLoading
               ? Center(child: CircularProgressIndicator())
               : errorMsg != null
                   ? Center(child: Text(errorMsg!, style: TextStyle(color: Colors.red)))
-                  : Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        if (currentWeather != null)
-                          Container(
-                            decoration: BoxDecoration(
-                              color: isDarkMode ? Colors.amber.shade700 : Colors.amberAccent,
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            padding: const EdgeInsets.all(24),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Icon(Icons.wb_sunny, size: 64, color: isDarkMode ? Colors.white : Colors.black),
-                                const SizedBox(height: 8),
-                                Text(
-                                  currentWeather!['weather'][0]['main'],
-                                  style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: isDarkMode ? Colors.white : Colors.black),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  "${currentWeather!['main']['temp'].round()}°   ${currentWeather!['main']['humidity']}%H",
-                                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: isDarkMode ? Colors.white : Colors.black),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  city.toLowerCase(),
-                                  style: TextStyle(fontSize: 20, fontFamily: 'monospace', color: isDarkMode ? Colors.white70 : Colors.black),
-                                ),
-                              ],
-                            ),
-                          ),
-                        const SizedBox(height: 16),
-                        if (dailyForecast.isNotEmpty)
-                          Container(
-                            decoration: BoxDecoration(
-                              color: isDarkMode ? Colors.blueGrey.shade800 : Colors.blueAccent,
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            padding: const EdgeInsets.all(16),
-                            height: 220,
-                            child: SingleChildScrollView(
-                              scrollDirection: Axis.horizontal,
-                              child: Row(
-                                children: dailyForecast.map((day) {
-                                  return Padding(
-                                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                                    child: Column(
-                                      children: [
-                                        Text(
-                                          _weekdayToString(day['day'].weekday),
-                                          style: TextStyle(fontWeight: FontWeight.bold, color: isDarkMode ? Colors.white : Colors.black),
-                                        ),
-                                        const SizedBox(height: 4),
-                                        Image.network(
-                                          'https://openweathermap.org/img/wn/${day['icon']}@2x.png',
-                                          width: 36,
-                                          height: 36,
-                                        ),
-                                        const SizedBox(height: 4),
-                                        Text('${day['temp'].round()}°',
-                                            style: TextStyle(fontWeight: FontWeight.bold, color: isDarkMode ? Colors.white : Colors.black)),
-                                        const SizedBox(height: 4),
-                                        Text('${(day['rain'] * 100).round()}%\nchance\nof rain',
-                                            textAlign: TextAlign.center,
-                                            style: TextStyle(fontSize: 12, color: isDarkMode ? Colors.white70 : Colors.black87)),
-                                      ],
-                                    ),
-                                  );
-                                }).toList(),
+                  : SingleChildScrollView(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          if (currentWeather != null)
+                            Hero(
+                              tag: 'weather-hero',
+                              child: WeatherCard(
+                                currentWeather: currentWeather!,
+                                city: city,
+                                isDarkMode: isDarkMode,
                               ),
                             ),
+                          const SizedBox(height: 16),
+                          WeeklyForecast(
+                            dailyForecast: dailyForecast,
+                            isDarkMode: isDarkMode,
+                            weekdayToString: _weekdayToString,
                           ),
-                        const SizedBox(height: 16),
-                        Container(
-                          decoration: BoxDecoration(
-                            color: isDarkMode ? Colors.grey.shade800 : Colors.grey.shade300,
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          padding: const EdgeInsets.all(16),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text('compare cities', style: TextStyle(fontWeight: FontWeight.bold, color: isDarkMode ? Colors.white : Colors.black)),
-                              const Divider(),
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                                children: [
-                                  _buildCityCompareBox(isDarkMode),
-                                  _buildCityCompareBox(isDarkMode),
-                                ],
-                              )
-                            ],
-                          ),
-                        ),
-                      ],
+                          const SizedBox(height: 16),
+                          CompareCitiesWidget(isDarkMode: isDarkMode),
+                        ],
+                      ),
                     ),
         ),
       ),
@@ -276,20 +226,5 @@ class _WeatherScreenState extends State<WeatherScreen> {
   String _weekdayToString(int weekday) {
     const days = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
     return days[weekday - 1];
-  }
-
-  Widget _buildCityCompareBox(bool isDarkMode) {
-    return GestureDetector(
-      onTap: _addCityComparison,
-      child: Container(
-        height: 60,
-        width: 60,
-        decoration: BoxDecoration(
-          color: isDarkMode ? Colors.grey.shade700 : Colors.grey.shade400,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Center(child: Icon(Icons.add, size: 28, color: isDarkMode ? Colors.white : Colors.black)),
-      ),
-    );
   }
 }
