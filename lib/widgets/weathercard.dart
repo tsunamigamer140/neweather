@@ -13,8 +13,32 @@ class WeatherCard extends StatelessWidget {
     required this.isDarkMode,
   });
 
+  IconData _getWeatherIcon(String main) {
+    switch (main.toLowerCase()) {
+      case 'clear':
+        return Icons.wb_sunny;
+      case 'clouds':
+        return Icons.cloud;
+      case 'rain':
+        return Icons.beach_access;
+      case 'drizzle':
+        return Icons.grain;
+      case 'thunderstorm':
+        return Icons.flash_on;
+      case 'snow':
+        return Icons.ac_unit;
+      case 'mist':
+      case 'fog':
+      case 'haze':
+        return Icons.blur_on;
+      default:
+        return Icons.wb_cloudy;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final weatherMain = currentWeather['weather'][0]['main'] ?? '';
     return Container(
       decoration: BoxDecoration(
         color: isDarkMode ? Colors.amber.shade700 : Colors.amberAccent,
@@ -24,10 +48,14 @@ class WeatherCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.wb_sunny, size: 64, color: isDarkMode ? Colors.white : Colors.black),
+          Icon(
+            _getWeatherIcon(weatherMain),
+            size: 64,
+            color: isDarkMode ? Colors.white : Colors.black,
+          ),
           const SizedBox(height: 8),
           Text(
-            currentWeather['weather'][0]['main'],
+            weatherMain,
             style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: isDarkMode ? Colors.white : Colors.black),
           ),
           const SizedBox(height: 4),
